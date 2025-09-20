@@ -20,6 +20,10 @@ const registerUser = asyncHandler( async (req, res) => {
     // get user detail from frontend
     const {fullname, email, username, password} = req.body
     console.log("email: ", email);
+    console.log("fullname: ", fullname);
+    console.log("username: ", username);
+    
+    
     
     //validation - not empty
     if ([fullname, email, username, password].some((field) => 
@@ -40,7 +44,7 @@ const registerUser = asyncHandler( async (req, res) => {
   
     
     // check for images, check for avatar
-    const avatarLocalPath = req.file?.avatar[0]?.path;
+    const avatarLocalPath = req.files?.avatar[0]?.path;
     const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
     if (!avatarLocalPath) {
@@ -63,7 +67,7 @@ const registerUser = asyncHandler( async (req, res) => {
     })
 
     const createdUser = await User.findById(user._id).select(
-        "_password _refreshToken"
+        "-password -refreshToken"
     )
     if (!createdUser) {
         throw new ApiError(500, "Something went wrong while registering the user")
