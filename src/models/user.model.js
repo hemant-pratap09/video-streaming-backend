@@ -13,9 +13,10 @@ const userSchema = new Schema(
         },
         email: {
             type: String,
-            required: true,
+            required:true,
             unique: true,
-            lowercase: true
+            lowercase: true,
+            trim: true
         },
         fullName: {
             type: String,
@@ -28,7 +29,7 @@ const userSchema = new Schema(
             required: false,
             default: "https://via.placeholder.com/150"
         },
-        Coverimage: {
+        CoverImage: {
             type: String, //cloudinary url
         },
         watchHistory: [
