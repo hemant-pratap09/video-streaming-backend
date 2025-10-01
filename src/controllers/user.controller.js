@@ -1,8 +1,9 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js"
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { UserImage } from "../models/userImage.model.js"
 
 
 const generateAccessAndRefreshTokens = async(userId) => {
@@ -264,57 +265,117 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
     .json(new ApiResponse(200, user, "Account details updated successfully"))
 })
 
-const updateUserAvatar = asyncHandler(async(req, res) => {
-    const avatarLocalPath = req.file?.path
 
-    if (!avatarLocalPath) {
-        throw new ApiError(400, "Avatar file is missing")
+
+
+const uploadUserImage = asyncHandler(async(req, res) => {
+    const imageType = req.query.type
+    const imageLocalPath = req.file?.path
+
+    if (!imageLocalPath) {
+        throw new ApiError(400, "Image file is missing")
     }
-    const avatar = await uploadOnCloudinary(avatarLocalPath)
-    if (!avatar.url) {
-        throw new ApiError(400, "Error while uploading on avatar")
+    if (!["avatar", "cover"].includes(imageType)) {
+        throw new ApiError(400, "Invalid image type")
     }
-    const user = await User.findByIdAndUpdate(
-        req.user?._id,
+
+    const uploadedImage = await uploadOnCloudinary(imageLocalPath)
+    if (!uploadedImage?.url) {
+        throw new ApiError(400, "Error while uploading image")
+    }
+
+    const userImage = await UserImage.create({
+        userId: req.user._id,
+        imageType,
+        url: uploadedImage.url,
+        publicId: uploadedImage.public_id,
+        isActive: false
+    })
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, userImage, `${imageType} uploaded successfully`))
+})
+
+const setActiveImage = asyncHandler(async(req, res) => {
+    const { imageId, imageType } = req.body
+
+    await UserImage.updateMany(
         {
-            $set: {
-                avatar: avatar.url
-            }
+            userId: req.user._id,
+            imageType,
+            isActive: true
         },
-        {new: true}
+        {
+            $set: { isActive: false }
+        }
+    )
+
+    const activatedImage = await UserImage.findOneAndUpdate(
+        {
+            _id: imageId,
+            userId: req.user._id
+        },
+        {
+            $set: { isActive: true }
+        },
+        { new: true }
+    )
+
+    if (!activatedImage) {
+        throw new ApiError(404, "Image not found")
+    }
+
+    const updateField = imageType === "avatar" ? "avatar" : "coverImage"
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            [updateField]: activatedImage.url
+        },
+        { new: true }
     ).select("-password")
 
     return res
     .status(200)
-    .json(new ApiResponse(200, user, "Avatar updated successfully"))
-
+    .json(new ApiResponse(200, { user, activatedImage }, `${imageType} set as active successfully`))
 })
 
-const updateUserCoverImage = asyncHandler(async(req, res) => {
-    const coverImageLocalPath = req.file?.path
+const getUserImages = asyncHandler(async(req, res) => {
+    const images = await UserImage.find({
+        userId: req.user._id
+    }).sort("-createdAt")
 
-    if (!coverImageLocalPath) {
-        throw new ApiError(400, "CoverImage file is missing")
-    }
-    const coverImage = await uploadOnCloudinary(avatarLocalPath)
-    if (!coverImage.url) {
-        throw new ApiError(400, "Error while uploading on coverImage")
-    }
-    const user = await User.findByIdAndUpdate(
-        req.user?._id,
-        {
-            $set: {
-                coverImage: coverImage.url
-            }
-        },
-        {new: true}
-    ).select("-password")
-    
     return res
     .status(200)
-    .json(new ApiResponse(200, user, "Cover Image updated successfully"))
-
+    .json(new ApiResponse(200, images, "User images fetched successfully"))
 })
+
+const deleteUserImage = asyncHandler(async(req, res) => {
+    const { imageId } = req.params
+
+    const image = await UserImage.findOne({
+        _id: imageId,
+        userId: req.user._id
+    })
+
+    if (!image) {
+        throw new ApiError(404, "Image not found")
+    }
+
+    if (image.isActive) {
+        throw new ApiError(400, "Cannot delete active image")
+    }
+
+    await deleteFromCloudinary(image.publicId)
+    await image.deleteOne()
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Image deleted successfully"))
+})
+
+
+
 export { 
     registerUser,
     loginUser,
@@ -323,7 +384,9 @@ export {
     changeCurrentPassword,
     getCurrentUser,
     updateAccountDetails,
-    updateUserAvatar,
-    updateUserCoverImage
+    uploadUserImage,
+    setActiveImage,
+    getUserImages,
+    deleteUserImage
 }
 
