@@ -10,7 +10,9 @@ import {
     registerUser, 
     setActiveImage, 
     updateAccountDetails, 
-    uploadUserImage 
+    uploadUserImage,
+    getUserChannelProfile,
+    getWatchHistory,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -47,5 +49,8 @@ router.route("/images")
 
 router.route("/images/set-active").patch(verifyJWT, setActiveImage)
 router.route("/images/:imageId").delete(verifyJWT, deleteUserImage)
+
+router.route("/c/:username").get(verify, getUserChannelProfile)
+router.route("/history").get(verifyJWT, getWatchHistory)
 
 export default router
