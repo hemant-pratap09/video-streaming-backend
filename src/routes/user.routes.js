@@ -50,7 +50,7 @@ router.route("/images")
 router.route("/images/set-active").patch(verifyJWT, setActiveImage)
 router.route("/images/:imageId").delete(verifyJWT, deleteUserImage)
 
-router.route("/c/:username").get(verify, getUserChannelProfile)
+router.route("/c/:username").get(verifyJWT, getUserChannelProfile)
 router.route("/history").get(verifyJWT, getWatchHistory)
 
 export default router
